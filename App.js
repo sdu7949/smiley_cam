@@ -6,7 +6,6 @@ import * as Permissions from "expo-permissions";
 import styled from "styled-components";
 import { MaterialIcons } from "@expo/vector-icons";
 import * as FaceDetector from 'expo-face-detector';
-import * as FileSystem from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
 
 const { width, height } = Dimensions.get("window");
@@ -34,14 +33,14 @@ export default class App extends React.Component {
     super(props);
     this.state = {
       hasPermission : null,
-      cameraType: Camera.Constants.Type.front,
-    smileDetected : false
+      cameraType: Camera.Constants.Type.front,  //카메라의 앞 뒤 타입을 담아두는 변수.
+    smileDetected : false                       //스마일 수치를 캐치하는 변수. 기본적으로 false
     };
     this.cameraRef = React.createRef();
   }
 
   componentDidMount = async () => {
-    const { status } = await Permissions.askAsync(Permissions.CAMERA);
+    const { status } = await Permissions.askAsync(Permissions.CAMERA);   //카메라를 사용 할 수 있도록 승인 안드로이드에서 승인받는 과정
     if (status === "granted") {
       this.setState({ hasPermission: true });
     } else {
@@ -117,7 +116,7 @@ export default class App extends React.Component {
     if(face){
       if(face.smilingProbability > 0.7){
         this.setState({
-          smileDeteced:true
+          smileDetected:true
         });
         this.takePhoto();
       }
