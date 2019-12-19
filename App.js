@@ -1,12 +1,17 @@
 import React from 'react';
-import { ActivityIndicator, Dimensions, TouchableOpacity } from 'react-native';
+import { ActivityIndicator, Dimensions, TouchableOpacity, Platform } from 'react-native';
 // import {Camera} from "expo";
 import { Camera } from "expo-camera";
 import * as Permissions from "expo-permissions";
 import styled from "styled-components";
 import { MaterialIcons } from "@expo/vector-icons";
+import * as FaceDetector from 'expo-face-detector';
+import * as FileSystem from 'expo-file-system';
+import * as MediaLibrary from 'expo-media-library';
 
 const { width, height } = Dimensions.get("window");
+
+const ALBUM_NAME = "Smiley Cam";
 
 const CenterView = styled.View`
   flex:1;
@@ -25,10 +30,16 @@ const IconBar = styled.View`
 `;
 
 export default class App extends React.Component {
-  state = {
-    hasPermission: null,
-    cameraType: Camera.Constants.Type.front
-  };
+  constructor(props){
+    super(props);
+    this.state = {
+      hasPermission : null,
+      cameraType: Camera.Constants.Type.front,
+    smileDetected : false
+    };
+    this.cameraRef = React.createRef();
+  }
+
   componentDidMount = async () => {
     const { status } = await Permissions.askAsync(Permissions.CAMERA);
     if (status === "granted") {
@@ -38,7 +49,7 @@ export default class App extends React.Component {
     }
   };
   render() {
-    const { hasPermission, cameraType } = this.state;
+    const { hasPermission, cameraType, smileDetected } = this.state;
     if (hasPermission === true) {
       return (
         <CenterView>
@@ -50,6 +61,12 @@ export default class App extends React.Component {
               overflow: "hidden"
             }}
             type={cameraType}
+            onFacesDetected={smileDetected ? null : this.onFacesDetected}
+            faceDetectorSettings={{
+              detectLandmarks: FaceDetector.Constants.Landmarks.all,
+              runClassifications: FaceDetector.Constants.Classifications.all
+            }}
+            ref={this.cameraRef}
           />
 
           <IconBar>
@@ -91,7 +108,64 @@ export default class App extends React.Component {
     }else{
       this.setState({
         cameraType : Camera.Constants.Type.front
-      })
+      });
+    }
+  };
+
+  onFacesDetected= ({faces}) =>{
+    const face = faces[0];
+    if(face){
+      if(face.smilingProbability > 0.7){
+        this.setState({
+          smileDeteced:true
+        });
+        this.takePhoto();
+      }
     }
   }
+
+  takePhoto = async () => {
+    try {
+      if (this.cameraRef.current) {
+        let { uri } = await this.cameraRef.current.takePictureAsync({
+          quality: 1
+        });
+        if (uri) {
+          this.savePhoto(uri);
+        }
+      }
+    } catch (error) {
+      alert(error);
+      this.setState({
+        smileDetected: false
+      });
+    }
+  };
+
+  savePhoto = async uri => {
+    try{
+      const {status} = await Permissions.askAsync(Permissions.CAMERA_ROLL)
+      if(status === "granted"){
+        const asset = await MediaLibrary.createAssetAsync(uri);
+        let album = await MediaLibrary.getAlbumAsync(ALBUM_NAME); 
+        if(album === null){
+          album = await MediaLibrary.createAlbumAsync(ALBUM_NAME, asset);
+        }else{
+          await MediaLibrary.addAssetsToAlbumAsync([asset], album.id);
+        }
+        setTimeout(
+          () =>
+            this.setState({
+              smileDetected: false
+            }),
+          2000
+        );
+      }else{
+        this.setState({hasPermission : false});
+      }
+    }catch(error){
+      console.log(error);
+    }
+  }
+
 }
